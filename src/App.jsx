@@ -5,37 +5,12 @@ import MemoizedMessageList from './components/MemoizedMessageList';
 import RichTextEditor from './components/RichTextEditor';
 import { ChatContext } from './context/ChatContext';
 
+
 const defaultProfile = {
   systemPrompt: "",
   max_output_tokens: 0,
   temperature: 0
 };
-
-// const parseMarkdownTable = (text) => {
-//   const lines = text.trim().split('\n');
-//   if (lines.length < 2 || !lines[0].startsWith('|') || !lines[1].startsWith('|---')) {
-//     return null;
-//   }
-  
-//   const headerLine = lines[0].slice(1, -1).split('|').map(h => h.trim().replace(/\s+/g, '_').replace(/\(.*\)/, '').toLowerCase());
-//   const dataLines = lines.slice(2);
-  
-//   return dataLines.map(line => {
-//     const values = line.slice(1, -1).split('|').map(v => v.trim());
-//     const profile = {};
-//     headerLine.forEach((header, i) => {
-//       let value = values[i];
-//       if (header === 'max_output_tokens') {
-//         profile[header] = parseInt(value, 10);
-//       } else if (header === 'temperature') {
-//         profile[header] = parseFloat(value);
-//       } else {
-//         profile[header] = value;
-//       }
-//     });
-//     return profile;
-//   });
-// };
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -43,17 +18,10 @@ function App() {
   const [error, setError] = useState(null);
   const [isCopied, copy] = useCopyToClipboard();
   const [promptProfiles, setPromptProfiles] = useState(null);
-  const azureFunctionUrl = "http://localhost:7071/CodeAgentFunction/v1/chat/completions";
+  const agentApiUrl = import.meta.env.VITE_NSCODE_AGENT_ENDPOINT;
 
   const handleMessageSubmit = useCallback(async (input) => {
     if (!input.trim()) return;
-
-    // const parsedProfiles = parseMarkdownTable(input);
-    // if (parsedProfiles) {
-    //   setPromptProfiles(parsedProfiles);
-    //   setMessages([...messages, { role: 'system', content: "Prompt profiles updated successfully." }]);
-    //   return;
-    // }
 
     setLoading(true);
     setError(null);
@@ -80,7 +48,7 @@ function App() {
     try {
       const messagesWithSystemPrompt = [{ role: 'system', content: activeProfile.systemPrompt }, ...newMessages];
 
-      const res = await fetch(azureFunctionUrl, {
+      const res = await fetch(agentApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,7 +72,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [messages, setLoading, setError, setPromptProfiles, azureFunctionUrl, promptProfiles, defaultProfile]);
+  }, [messages, setLoading, setError, setPromptProfiles, agentApiUrl, promptProfiles, defaultProfile]);
 
   const contextValue = useMemo(() => ({
     messages,
