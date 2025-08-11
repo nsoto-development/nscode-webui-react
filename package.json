@@ -10,11 +10,27 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lexical/clipboard": "^0.34.0",
+    "@lexical/code": "^0.34.0",
+    "@lexical/history": "^0.34.0",
+    "@lexical/html": "^0.34.0",
+    "@lexical/link": "^0.34.0",
+    "@lexical/list": "^0.34.0",
+    "@lexical/markdown": "^0.34.0",
+    "@lexical/overflow": "^0.34.0",
+    "@lexical/react": "^0.34.0",
+    "@lexical/rich-text": "^0.34.0",
+    "@lexical/selection": "^0.34.0",
+    "@lexical/table": "^0.34.0",
+    "dotenv": "^17.2.1",
+    "lexical": "^0.34.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^15.6.1",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

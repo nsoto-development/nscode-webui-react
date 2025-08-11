@@ -15,6 +15,7 @@ html, body, #root {
 body {
   font-family: Arial, sans-serif;
   background-color: #121212; /* Dark background color */
+  color: #f0f0f0; /* Light text for readability */
 }
 
 /* Overall container for the entire app */
@@ -72,22 +73,28 @@ body {
 /* Styles for individual chat bubbles */
 .message-bubble {
   padding: 12px 18px;
-  border-radius: 20px;
   max-width: 80%;
   word-wrap: break-word;
+  position: relative;
 }
 
-/* User message styles */
+/* User message styles - NEW DARK GRAY */
 .message-bubble.user {
-  background-color: #007bff; /* Original blue retained for user messages */
+  background-color: #333333; /* Dark gray, same as original response bubble */
   color: #fff;
+  border-radius: 20px;
   align-self: flex-end;
 }
 
-/* Assistant message styles */
+/* Assistant message styles - full-width, no bubble */
 .message-bubble.assistant {
-  background-color: #333333; /* Darker gray for assistant messages */
+  background-color: #1e1e1e; /* Matches chat window background */
   color: #ffffff;
+  width: 100%;
+  max-width: none;
+  border-radius: 0; /* Remove border-radius for a flat look */
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
   align-self: flex-start;
 }
 
@@ -103,34 +110,20 @@ body {
   border-top: 1px solid #282828; /* Darker border */
   background-color: #1e1e1e; /* Matches chat window background */
   gap: 10px;
+  align-items: flex-end; /* Align items to the bottom */
 }
 
-.input-textarea {
-  flex-grow: 1;
-  border: 1px solid #444444; /* Darker border */
-  background-color: #282828; /* Dark input background */
-  color: #ffffff; /* White text */
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 1rem;
-  resize: none;
-  transition: border-color 0.3s;
-}
-
-.input-textarea:focus {
-  outline: none;
-  border-color: #007bff; /* Retains the blue focus highlight */
-}
-
+/* Send button styles (from original, moved here for clarity) */
 .send-button {
   padding: 10px 20px;
   border: none;
   border-radius: 8px;
-  background-color: #28a745;
+  background-color: #007bff; /* A vibrant blue for the send button */
   color: #fff;
   font-size: 1rem;
   cursor: pointer;
   transition: background-color 0.3s;
+  height: 40px; /* Ensure consistent height */
 }
 
 .send-button:disabled {
@@ -139,7 +132,7 @@ body {
 }
 
 .send-button:hover:not(:disabled) {
-  background-color: #218838;
+  background-color: #0056b3; /* A darker blue on hover */
 }
 
 /* Error message styling */
@@ -206,7 +199,7 @@ body {
 }
 
 /* ------------------- Code Block Styling Enhancements ------------------- */
-/* Styling for the code block container */
+/* Styling for the code block container in MemoizedMessageList */
 .code-block-container {
   position: relative;
   border-radius: 8px;
@@ -237,30 +230,77 @@ body {
   align-items: center;
 }
 
+/* Consolidated and improved copy button styles */
 .copy-button {
-  background: none;
+  background-color: #4a4a4a; /* A neutral, dark gray */
   border: none;
-  color: #fff;
+  border-radius: 6px; /* Slightly more rounded corners */
+  color: #ffffff; /* White icon color */
   cursor: pointer;
-  font-size: 1em;
-  transition: color 0.2s;
+  padding: 8px; /* Consistent padding for a square button */
+  transition: background-color 0.3s ease, transform 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .copy-button:hover {
-  color: #007bff;
+  background-color: #5d5d5d; /* Lighter gray on hover */
 }
 
-/* The "Copied!" message */
+.copy-button:focus {
+  outline: 2px solid #007bff; /* Blue outline for accessibility */
+  outline-offset: 2px;
+}
+
+.copy-button:active {
+  transform: scale(0.95); /* Slight scale down on click */
+}
+
+.copy-button svg {
+  width: 18px; /* Slightly larger icon */
+  height: 18px;
+}
+
+/* Style for the copy button specifically inside the user message bubbles */
+.message-bubble.user .copy-button {
+  background-color: #4a4a4a; /* Dark gray to match theme */
+  color: #fff;
+}
+
+.message-bubble.user .copy-button:hover {
+  background-color: #5d5d5d;
+}
+
+/* Style for the copy button specifically inside the assistant message bubbles */
+.message-bubble.assistant .copy-button {
+  background-color: #4a4a4a; /* Dark gray to match theme */
+  color: #fff;
+}
+
+.message-bubble.assistant .copy-button:hover {
+  background-color: #5d5d5d;
+}
+
+/* The "Copied!" message - NOW A DARKER GRAY */
 .copied-message {
   position: absolute;
-  right: 30px; /* Position it next to the button */
-  background-color: #28a745;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #4a4a4a; /* Dark gray background color */
   color: #fff;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8em;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85em;
   white-space: nowrap;
-  animation: fade-in-out 2s forwards;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none; /* Prevents the message from blocking clicks */
+}
+
+.copied-message.visible {
+  opacity: 1;
 }
 
 /* Ensure SyntaxHighlighter's pre tag doesn't have a background */
@@ -271,9 +311,85 @@ body {
   background-color: #282c34 !important;
 }
 
-@keyframes fade-in-out {
-  0% { opacity: 0; }
-  25% { opacity: 1; }
-  75% { opacity: 1; }
-  100% { opacity: 0; }
+.markdown-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.markdown-th,
+.markdown-td {
+  border: 1px solid #ccc;
+  padding: 8px;
+}
+
+.inline-code {
+  background-color: rgba(135, 131, 120, 0.15);
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  font-size: 0.9em;
+  font-family: monospace;
+}
+
+/* --- Lexical specific styling for rich text editor --- */
+.editor-wrapper {
+  flex-grow: 1;
+  position: relative;
+  border: 1px solid #444444; /* Darker border */
+  background-color: #282828; /* Dark input background */
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 40px;
+  max-height: 200px;
+  overflow-y: auto;
+  color: #ffffff;
+  display: flex; /* Important for placeholder positioning */
+  align-items: flex-start; /* Align content to the top within the wrapper */
+}
+
+.editor-input {
+  outline: none;
+  border: none;
+  padding: 0;
+  min-height: 20px; /* Adjust as needed */
+  resize: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  caret-color: #007bff;
+  width: 100%; /* Ensures content editable takes full available width */
+  white-space: pre-wrap; /* Allows long lines to wrap */
+  word-break: break-word; /* Prevents overflow of long words */
+}
+
+.editor-input-wrapper {
+    flex-grow: 1;
+}
+
+.editor-placeholder {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: #888888;
+  pointer-events: none;
+  user-select: none;
+  font-size: 1rem;
+}
+
+.editor-wrapper:focus-within {
+  border-color: #007bff;
+}
+
+/* This is critical for ```` ```` to form a block */
+.editor-code-block {
+  display: block; /* Ensures it's a block-level element */
+  background-color: #21252b; /* Dark background for code */
+  color: #abb2bf; /* Light text for code */
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace; /* Monospaced font */
+  font-size: 0.9em;
+  line-height: 1.4em;
+  padding: 10px 15px;
+  margin: 10px 0; /* Add margin to separate from other content */
+  border-radius: 6px;
+  overflow-x: auto; /* Allow horizontal scrolling for very long lines */
+  white-space: pre-wrap; /* Crucial for code blocks to wrap */
+  word-break: break-all; /* Ensure long words break within the block */
 }
