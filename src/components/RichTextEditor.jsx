@@ -23,10 +23,10 @@ import { TableCellNode, TableNode, TableRowNode } from '@lexical/table';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
 import { TRANSFORMERS, $convertToMarkdownString } from '@lexical/markdown';
-import * as LexicalHtml from '@lexical/html'; // Corrected: Using a namespace import
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
 
+import HtmlPlugin from './HtmlPlugin'; // <-- Import the new HtmlPlugin from components
 import '../App.css';
 import { ChatContext } from '../context/ChatContext';
 
@@ -49,6 +49,7 @@ const editorNodes = [
   ParagraphNode,
 ];
 
+// This plugin is used to detect if the editor is empty and update a state variable.
 const EmptyStatePlugin = ({ onUpdateEmptyState }) => {
   const [editor] = useLexicalComposerContext();
   useEffect(() => {
@@ -67,6 +68,7 @@ const EmptyStatePlugin = ({ onUpdateEmptyState }) => {
   return null;
 };
 
+// This plugin handles submitting the message when the Enter key is pressed.
 const SubmitOnEnterPlugin = ({ onSubmit }) => {
   const [editor] = useLexicalComposerContext();
 
@@ -88,44 +90,7 @@ const SubmitOnEnterPlugin = ({ onSubmit }) => {
   return null;
 };
 
-// Plugin to handle pasting rich HTML content
-const HtmlPlugin = () => {
-  const [editor] = useLexicalComposerContext();
-
-  useEffect(() => {
-    return editor.registerCommand(
-      PASTE_COMMAND,
-      (event) => {
-        const clipboardData = event.clipboardData;
-        const htmlData = clipboardData.getData('text/html');
-
-        if (htmlData) {
-          editor.update(() => {
-            const parser = new DOMParser();
-            const dom = parser.parseFromString(htmlData, 'text/html');
-            const nodes = LexicalHtml.$convertFromHTML(dom); // Corrected: Accessing function from namespace
-            const selection = $getSelection();
-
-            if ($isRangeSelection(selection)) {
-              $insertNodes(nodes);
-            } else {
-              const root = $getRoot();
-              root.clear();
-              root.append(...nodes);
-            }
-          });
-          event.preventDefault();
-          return true;
-        }
-        return false;
-      },
-      COMMAND_PRIORITY_CRITICAL
-    );
-  }, [editor]);
-
-  return null;
-};
-
+// This is the core editor component, which holds all the plugins.
 const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
   const [editor] = useLexicalComposerContext();
 
@@ -163,11 +128,12 @@ const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
       <LinkPlugin />
       <EmptyStatePlugin onUpdateEmptyState={onUpdateEmptyState} />
       <SubmitOnEnterPlugin onSubmit={onSubmit} />
-      <HtmlPlugin />
+      <HtmlPlugin /> {/* <-- The HtmlPlugin is now being used here */}
     </>
   );
 });
 
+// This component wraps the editor with the LexicalComposer context.
 const MyLexicalEditorWithComposer = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
   const initialConfig = {
     namespace: 'my-chat-editor',
@@ -195,6 +161,7 @@ const MyLexicalEditorWithComposer = forwardRef(({ onSubmit, onUpdateEmptyState }
   );
 });
 
+// The main component that renders the full editor UI.
 export default function RichTextEditor() {
   const { isLoading, handleMessageSubmit } = useContext(ChatContext);
   const editorRef = useRef(null);
