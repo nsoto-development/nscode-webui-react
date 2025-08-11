@@ -9,15 +9,21 @@ import {
   $getRoot,
   $createParagraphNode,
   ParagraphNode,
-  LineBreakNode
+  $isParagraphNode,
+  PASTE_COMMAND,
+  COMMAND_PRIORITY_CRITICAL,
+  $getSelection,
+  $insertNodes,
+  $isRangeSelection,
 } from 'lexical';
-import { CodeNode } from '@lexical/code';
-import { ListItemNode, ListNode } from '@lexical/list';
+import { CodeNode, $isCodeNode } from '@lexical/code';
+import { ListItemNode, ListNode, $isListItemNode } from '@lexical/list';
 import { LinkNode } from '@lexical/link';
 import { TableCellNode, TableNode, TableRowNode } from '@lexical/table';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
-import { TRANSFORMERS } from '@lexical/markdown';
+import { TRANSFORMERS, $convertToMarkdownString } from '@lexical/markdown';
+import * as LexicalHtml from '@lexical/html'; // Corrected: Using a namespace import
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
 
@@ -40,35 +46,28 @@ const editorNodes = [
   TableCellNode,
   TableRowNode,
   LinkNode,
-  LineBreakNode,
   ParagraphNode,
 ];
 
-function ToolbarPlugin({ onUpdateEmptyState }) {
+const EmptyStatePlugin = ({ onUpdateEmptyState }) => {
   const [editor] = useLexicalComposerContext();
-
   useEffect(() => {
-    const checkEmptyState = () => {
+    const update = () => {
       editor.getEditorState().read(() => {
         const root = $getRoot();
         const content = root.getTextContent();
-        const isEditorContentEmpty = content.trim() === '';
-        const isEmptyParagraphOnly = root.getChildrenSize() === 1 && root.getFirstChild()?.getTextContent() === '';
-        const isEmpty = isEditorContentEmpty && isEmptyParagraphOnly;
+        const isEmpty = content.trim() === '';
         onUpdateEmptyState(isEmpty);
       });
     };
-    
-    const removeListener = editor.registerUpdateListener(checkEmptyState);
-    checkEmptyState();
-
+    const removeListener = editor.registerUpdateListener(update);
+    update();
     return () => removeListener();
   }, [editor, onUpdateEmptyState]);
-
   return null;
-}
+};
 
-function KeyBindingsPlugin({ onSubmit, isEditorEmpty }) {
+const SubmitOnEnterPlugin = ({ onSubmit }) => {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
@@ -78,113 +77,150 @@ function KeyBindingsPlugin({ onSubmit, isEditorEmpty }) {
         if (event.shiftKey) {
           return false;
         }
-
-        if (!isEditorEmpty) {
-          editor.update(() => {
-            const root = $getRoot();
-            const content = root.getTextContent();
-            onSubmit(content);
-            root.clear();
-            root.append($createParagraphNode());
-          });
-        }
-        
+        event.preventDefault();
+        event.stopPropagation();
+        onSubmit(event);
         return true;
       },
       1
     );
-  }, [editor, onSubmit, isEditorEmpty]);
-
+  }, [editor, onSubmit]);
   return null;
-}
+};
 
-// NEW: This component wraps the imperative logic
-function LexicalController({ onSubmit, isEditorEmpty, submitRef }) {
+// Plugin to handle pasting rich HTML content
+const HtmlPlugin = () => {
   const [editor] = useLexicalComposerContext();
 
-  useImperativeHandle(submitRef, () => ({
-    submit: () => {
-      if (!isEditorEmpty) {
-        editor.update(() => {
-          const root = $getRoot();
-          const content = root.getTextContent();
-          onSubmit(content);
-          root.clear();
-          root.append($createParagraphNode());
-        });
-      }
+  useEffect(() => {
+    return editor.registerCommand(
+      PASTE_COMMAND,
+      (event) => {
+        const clipboardData = event.clipboardData;
+        const htmlData = clipboardData.getData('text/html');
+
+        if (htmlData) {
+          editor.update(() => {
+            const parser = new DOMParser();
+            const dom = parser.parseFromString(htmlData, 'text/html');
+            const nodes = LexicalHtml.$convertFromHTML(dom); // Corrected: Accessing function from namespace
+            const selection = $getSelection();
+
+            if ($isRangeSelection(selection)) {
+              $insertNodes(nodes);
+            } else {
+              const root = $getRoot();
+              root.clear();
+              root.append(...nodes);
+            }
+          });
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      },
+      COMMAND_PRIORITY_CRITICAL
+    );
+  }, [editor]);
+
+  return null;
+};
+
+const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
+  const [editor] = useLexicalComposerContext();
+
+  useImperativeHandle(ref, () => ({
+    getMarkdown: () => {
+      let markdown = '';
+      editor.getEditorState().read(() => {
+        markdown = $convertToMarkdownString(TRANSFORMERS);
+      });
+      return markdown;
+    },
+    clearEditor: () => {
+      editor.update(() => {
+        const root = $getRoot();
+        root.clear();
+        root.append($createParagraphNode());
+        root.getFirstChild().select();
+      });
     },
   }));
 
-  return null;
-}
-
-const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState, isEditorEmpty }, ref) => {
-    const initialConfig = {
-      namespace: 'my-chat-editor',
-      theme,
-      nodes: editorNodes,
-      editorState: () => {
-        const root = $getRoot();
-        if (root.isEmpty()) {
-          root.append($createParagraphNode());
+  return (
+    <>
+      <RichTextPlugin
+        contentEditable={
+          <div className="editor-input-wrapper">
+            <ContentEditable className="editor-input" spellCheck={true} autoFocus={true} />
+          </div>
         }
-      },
-      onError(error) {
-        console.error('Lexical editor error:', error);
-      },
-    };
+        placeholder={<div className="editor-placeholder">Type your message...</div>}
+      />
+      <HistoryPlugin />
+      <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+      <ListPlugin />
+      <LinkPlugin />
+      <EmptyStatePlugin onUpdateEmptyState={onUpdateEmptyState} />
+      <SubmitOnEnterPlugin onSubmit={onSubmit} />
+      <HtmlPlugin />
+    </>
+  );
+});
 
-    return (
-      <LexicalComposer initialConfig={initialConfig}>
-        <RichTextPlugin
-          contentEditable={
-            <div className="editor-input-wrapper">
-              <ContentEditable
-                className="editor-input"
-                spellCheck={true}
-                autoFocus={false}
-              />
-            </div>
-          }
-          placeholder={<div className="editor-placeholder">Type your message...</div>}
-        />
-        <HistoryPlugin />
-        <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-        <ListPlugin />
-        <LinkPlugin />
-        
-        <ToolbarPlugin onUpdateEmptyState={onUpdateEmptyState} />
-        <KeyBindingsPlugin onSubmit={onSubmit} isEditorEmpty={isEditorEmpty} />
-        <LexicalController onSubmit={onSubmit} isEditorEmpty={isEditorEmpty} submitRef={ref} /> {/* NEW COMPONENT */}
-      </LexicalComposer>
-    );
+const MyLexicalEditorWithComposer = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
+  const initialConfig = {
+    namespace: 'my-chat-editor',
+    theme,
+    nodes: editorNodes,
+    editorState: () => {
+      const root = $getRoot();
+      if (root.isEmpty()) {
+        root.append($createParagraphNode());
+      }
+    },
+    onError(error) {
+      console.error('Lexical editor error:', error);
+    },
+  };
+
+  return (
+    <LexicalComposer initialConfig={initialConfig}>
+      <MyLexicalEditor
+        ref={ref}
+        onSubmit={onSubmit}
+        onUpdateEmptyState={onUpdateEmptyState}
+      />
+    </LexicalComposer>
+  );
 });
 
 export default function RichTextEditor() {
   const { isLoading, handleMessageSubmit } = useContext(ChatContext);
-  const submitRef = useRef(null);
+  const editorRef = useRef(null);
   const [isEditorEmpty, setIsEditorEmpty] = useState(true);
 
   const handleUpdateEmptyState = useCallback((isEmpty) => {
     setIsEditorEmpty(isEmpty);
   }, []);
 
-  const handleFormSubmit = (e) => {
+  const handleSubmission = useCallback((e) => {
     e.preventDefault();
-    if (submitRef.current) {
-      submitRef.current.submit();
+
+    if (!isEditorEmpty && editorRef.current) {
+      const content = editorRef.current.getMarkdown();
+      handleMessageSubmit(content);
+      editorRef.current.clearEditor();
     }
-  };
+  }, [isEditorEmpty, handleMessageSubmit]);
 
   return (
-    <form onSubmit={handleFormSubmit} className="input-form">
+    <form className="input-form" onSubmit={handleSubmission}>
       <div className="input-container editor-wrapper">
-        <MyLexicalEditor 
-          ref={submitRef} 
-          onSubmit={handleMessageSubmit}
+        <MyLexicalEditorWithComposer
+          ref={editorRef}
+          onSubmit={handleSubmission}
           onUpdateEmptyState={handleUpdateEmptyState}
-          isEditorEmpty={isEditorEmpty}
         />
       </div>
       <button
