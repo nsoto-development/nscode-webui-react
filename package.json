@@ -13,6 +13,7 @@
     "@lexical/clipboard": "^0.34.0",
     "@lexical/code": "^0.34.0",
     "@lexical/history": "^0.34.0",
+    "@lexical/html": "^0.34.0",
     "@lexical/link": "^0.34.0",
     "@lexical/list": "^0.34.0",
     "@lexical/markdown": "^0.34.0",
