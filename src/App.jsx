@@ -1,27 +1,59 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import './App.css';
-import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FaCopy } from 'react-icons/fa';
 import { useCopyToClipboard } from './hooks/useCopyToClipboard';
+import MemoizedMessageList from './components/MemoizedMessageList';
+import RichTextEditor from './components/RichTextEditor';
+import { ChatContext } from './context/ChatContext';
 
+const defaultProfile = {
+  systemPrompt: "",
+  max_output_tokens: 0,
+  temperature: 0
+};
+
+const parseMarkdownTable = (text) => {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2 || !lines[0].startsWith('|') || !lines[1].startsWith('|---')) {
+    return null;
+  }
+  
+  const headerLine = lines[0].slice(1, -1).split('|').map(h => h.trim().replace(/\s+/g, '_').replace(/\(.*\)/, '').toLowerCase());
+  const dataLines = lines.slice(2);
+  
+  return dataLines.map(line => {
+    const values = line.slice(1, -1).split('|').map(v => v.trim());
+    const profile = {};
+    headerLine.forEach((header, i) => {
+      let value = values[i];
+      if (header === 'max_output_tokens') {
+        profile[header] = parseInt(value, 10);
+      } else if (header === 'temperature') {
+        profile[header] = parseFloat(value);
+      } else {
+        profile[header] = value;
+      }
+    });
+    return profile;
+  });
+};
 
 function App() {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Use the custom hook to manage copy state and functionality
   const [isCopied, copy] = useCopyToClipboard();
-
-  // You would replace this with your actual Azure Function URL
+  const [promptProfiles, setPromptProfiles] = useState(null);
   const azureFunctionUrl = "http://localhost:7071/CodeAgentFunction/v1/chat/completions";
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleMessageSubmit = useCallback(async (input) => {
     if (!input.trim()) return;
+
+    const parsedProfiles = parseMarkdownTable(input);
+    if (parsedProfiles) {
+      setPromptProfiles(parsedProfiles);
+      setMessages([...messages, { role: 'system', content: "Prompt profiles updated successfully." }]);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -29,17 +61,33 @@ function App() {
     const userMessage = { role: 'user', content: input };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    setInput('');
+    
+    let activeProfile = defaultProfile;
+    if (promptProfiles) {
+      for (const profile of promptProfiles) {
+        const triggers = profile.when_it_fires.split(/[–—,;]/).map(t => t.trim().toLowerCase()).filter(Boolean);
+        if (triggers.some(trigger => userMessage.content.toLowerCase().includes(trigger)) || profile.intent.toLowerCase() === "standard") {
+          activeProfile = {
+            systemPrompt: profile.system_prompt,
+            max_output_tokens: profile.max_output_tokens,
+            temperature: profile.temperature
+          };
+          break;
+        }
+      }
+    }
 
     try {
+      const messagesWithSystemPrompt = [{ role: 'system', content: activeProfile.systemPrompt }, ...newMessages];
+
       const res = await fetch(azureFunctionUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: "test-model",
-          messages: newMessages
+          messages: messagesWithSystemPrompt,
+          max_tokens: activeProfile.max_output_tokens,
+          temperature: activeProfile.temperature,
         }),
       });
 
@@ -56,90 +104,28 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [messages, setLoading, setError, setPromptProfiles, azureFunctionUrl, promptProfiles, defaultProfile]);
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
+  const contextValue = useMemo(() => ({
+    messages,
+    isLoading,
+    isCopied,
+    copy,
+    error,
+    handleMessageSubmit,
+  }), [messages, isLoading, isCopied, copy, error, handleMessageSubmit]);
 
   return (
-    <div className="app-container">
-      <div className="chat-window">
-        <h1 className="chat-header">LLM Test Interface</h1>
-        <div className="message-list">
-          {messages.length === 0 && (
-            <p className="placeholder-text">Start the conversation...</p>
-          )}
-          {messages.map((msg, index) => (
-            <div key={index} className={`message-bubble ${msg.role}`}>
-              <div className="message-content">
-                <strong>{msg.role}:</strong>
-                <ReactMarkdown
-                  children={msg.content}
-                  components={{
-                    // This is the custom component for a code block
-                    code({ node, inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || '');
-                      const codeContent = String(children).replace(/\n$/, '');
-                      return !inline && match ? (
-                        <div className="code-block-container">
-                          <div className="code-header">
-                            <span className="code-language">{match[1]}</span>
-                            <div className="copy-container">
-                              {/* The copy button and copied message */}
-                              <button className="copy-button" onClick={() => copy(codeContent)}>
-                                <FaCopy />
-                              </button>
-                              {/* Display "Copied!" message for 2 seconds */}
-                              {isCopied && <span className="copied-message">Copied!</span>}
-                            </div>
-                          </div>
-                          <SyntaxHighlighter
-                            style={oneDark}
-                            language={match[1]}
-                            PreTag="div"
-                            {...props}
-                          >
-                            {codeContent}
-                          </SyntaxHighlighter>
-                        </div>
-                      ) : (
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      );
-                    },
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="message-bubble assistant">
-              <div className="dot-flashing"></div>
-            </div>
-          )}
+    <ChatContext.Provider value={contextValue}>
+      <div className="app-container">
+        <div className="chat-window">
+          <h1 className="chat-header">LLM Test Interface</h1>
+          <MemoizedMessageList />
+          <RichTextEditor />
         </div>
-        <form onSubmit={handleSubmit} className="input-form">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown} 
-            placeholder="Type your message here..."
-            rows="3"
-            disabled={loading}
-            className="input-textarea"
-          />
-          <button type="submit" disabled={loading} className="send-button">
-            {loading ? 'Sending...' : 'Send'}
-          </button>
-        </form>
+        {error && <p className="error-message">Error: {error}</p>}
       </div>
-      {error && <p className="error-message">Error: {error}</p>}
-    </div>
+    </ChatContext.Provider>
   );
 }
 
