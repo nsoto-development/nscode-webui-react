@@ -1,4 +1,13 @@
-import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle, useContext, useCallback } from 'react';
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+  useContext,
+  useCallback,
+  useMemo,
+} from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -9,27 +18,28 @@ import {
   $getRoot,
   $createParagraphNode,
   ParagraphNode,
-  $isParagraphNode,
-  PASTE_COMMAND,
-  COMMAND_PRIORITY_CRITICAL,
-  $getSelection,
-  $insertNodes,
-  $isRangeSelection,
 } from 'lexical';
-import { CodeNode, $isCodeNode } from '@lexical/code';
-import { ListItemNode, ListNode, $isListItemNode } from '@lexical/list';
+import { CodeNode } from '@lexical/code';
+import { ListItemNode, ListNode } from '@lexical/list';
 import { LinkNode } from '@lexical/link';
-import { TableCellNode, TableNode, TableRowNode } from '@lexical/table';
+import {
+  TableCellNode,
+  TableNode,
+  TableRowNode,
+} from '@lexical/table';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
-import { TRANSFORMERS, $convertToMarkdownString } from '@lexical/markdown';
+import {
+  TRANSFORMERS,
+  $convertToMarkdownString,
+} from '@lexical/markdown';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
-
-import HtmlPlugin from './HtmlPlugin'; // <-- Import the new HtmlPlugin from components
+import HtmlPlugin from './HtmlPlugin';
 import '../App.css';
 import { ChatContext } from '../context/ChatContext';
 
+/* ---------- Theme & Nodes ---------- */
 const theme = {
   code: 'editor-code-block',
   paragraph: 'editor-paragraph',
@@ -49,26 +59,27 @@ const editorNodes = [
   ParagraphNode,
 ];
 
-// This plugin is used to detect if the editor is empty and update a state variable.
+/* ---------- EmptyStatePlugin ---------- */
 const EmptyStatePlugin = ({ onUpdateEmptyState }) => {
   const [editor] = useLexicalComposerContext();
+
   useEffect(() => {
     const update = () => {
       editor.getEditorState().read(() => {
         const root = $getRoot();
         const content = root.getTextContent();
-        const isEmpty = content.trim() === '';
-        onUpdateEmptyState(isEmpty);
+        onUpdateEmptyState(content.trim() === '');
       });
     };
-    const removeListener = editor.registerUpdateListener(update);
+    const remove = editor.registerUpdateListener(update);
     update();
-    return () => removeListener();
+    return () => remove();
   }, [editor, onUpdateEmptyState]);
+
   return null;
 };
 
-// This plugin handles submitting the message when the Enter key is pressed.
+/* ---------- SubmitOnEnterPlugin ---------- */
 const SubmitOnEnterPlugin = ({ onSubmit }) => {
   const [editor] = useLexicalComposerContext();
 
@@ -76,9 +87,7 @@ const SubmitOnEnterPlugin = ({ onSubmit }) => {
     return editor.registerCommand(
       KEY_ENTER_COMMAND,
       (event) => {
-        if (event.shiftKey) {
-          return false;
-        }
+        if (event.shiftKey) return false;
         event.preventDefault();
         event.stopPropagation();
         onSubmit(event);
@@ -87,19 +96,36 @@ const SubmitOnEnterPlugin = ({ onSubmit }) => {
       1
     );
   }, [editor, onSubmit]);
+
   return null;
 };
 
-// This is the core editor component, which holds all the plugins.
+/* ---------- Core editor component ---------- */
 const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
   const [editor] = useLexicalComposerContext();
 
+  // TRANSFORMERS already includes the multiline CODE transformer.
+  const markdownTransformers = useMemo(() => [...TRANSFORMERS], []);
+
+  // Expose imperative methods to the parent.
   useImperativeHandle(ref, () => ({
+    /** Return markdown with a guaranteed language identifier */
     getMarkdown: () => {
       let markdown = '';
       editor.getEditorState().read(() => {
-        markdown = $convertToMarkdownString(TRANSFORMERS);
+        // NOTE: $convertToMarkdownString signature is (transformers?, rootNode?, preserveNewLines?)
+        markdown = $convertToMarkdownString(markdownTransformers, $getRoot());
       });
+      // ---- NEW: inject fallback language when missing ----
+      // Replace a fence that is immediately followed by a newline (i.e. ```\n) with ```plaintext\n
+      markdown = markdown.replace(
+        // ^\s*   → start of line + any indentation
+        // ```    → three back‑ticks
+        // (?=\r?\n) → look‑ahead that the next characters are a newline (no language token)
+        /^\s*```(?=\r?\n)/gm,
+        // Preserve the original indentation (captured by \s*) and inject the language
+        (match) => `${match}plaintext`
+      );
       return markdown;
     },
     clearEditor: () => {
@@ -117,7 +143,11 @@ const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
       <RichTextPlugin
         contentEditable={
           <div className="editor-input-wrapper">
-            <ContentEditable className="editor-input" spellCheck={true} autoFocus={true} />
+            <ContentEditable
+              className="editor-input"
+              spellCheck={true}
+              autoFocus={true}
+            />
           </div>
         }
         placeholder={<div className="editor-placeholder">Type your message...</div>}
@@ -128,40 +158,42 @@ const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
       <LinkPlugin />
       <EmptyStatePlugin onUpdateEmptyState={onUpdateEmptyState} />
       <SubmitOnEnterPlugin onSubmit={onSubmit} />
-      <HtmlPlugin /> {/* <-- The HtmlPlugin is now being used here */}
+      <HtmlPlugin />
     </>
   );
 });
 
-// This component wraps the editor with the LexicalComposer context.
-const MyLexicalEditorWithComposer = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
-  const initialConfig = {
-    namespace: 'my-chat-editor',
-    theme,
-    nodes: editorNodes,
-    editorState: () => {
-      const root = $getRoot();
-      if (root.isEmpty()) {
-        root.append($createParagraphNode());
-      }
-    },
-    onError(error) {
-      console.error('Lexical editor error:', error);
-    },
-  };
+/* ---------- Composer wrapper ---------- */
+const MyLexicalEditorWithComposer = forwardRef(
+  ({ onSubmit, onUpdateEmptyState }, ref) => {
+    const initialConfig = {
+      namespace: 'my-chat-editor',
+      theme,
+      nodes: editorNodes,
+      editorState: () => {
+        const root = $getRoot();
+        if (root.isEmpty()) {
+          root.append($createParagraphNode());
+        }
+      },
+      onError(error) {
+        console.error('Lexical editor error:', error);
+      },
+    };
 
-  return (
-    <LexicalComposer initialConfig={initialConfig}>
-      <MyLexicalEditor
-        ref={ref}
-        onSubmit={onSubmit}
-        onUpdateEmptyState={onUpdateEmptyState}
-      />
-    </LexicalComposer>
-  );
-});
+    return (
+      <LexicalComposer initialConfig={initialConfig}>
+        <MyLexicalEditor
+          ref={ref}
+          onSubmit={onSubmit}
+          onUpdateEmptyState={onUpdateEmptyState}
+        />
+      </LexicalComposer>
+    );
+  }
+);
 
-// The main component that renders the full editor UI.
+/* ---------- Exported component ---------- */
 export default function RichTextEditor() {
   const { isLoading, handleMessageSubmit } = useContext(ChatContext);
   const editorRef = useRef(null);
@@ -171,15 +203,18 @@ export default function RichTextEditor() {
     setIsEditorEmpty(isEmpty);
   }, []);
 
-  const handleSubmission = useCallback((e) => {
-    e.preventDefault();
-
-    if (!isEditorEmpty && editorRef.current) {
-      const content = editorRef.current.getMarkdown();
-      handleMessageSubmit(content);
-      editorRef.current.clearEditor();
-    }
-  }, [isEditorEmpty, handleMessageSubmit]);
+  const handleSubmission = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (!isEditorEmpty && editorRef.current) {
+        const content = editorRef.current.getMarkdown();
+        console.log('📝 markdown payload →', content);
+        handleMessageSubmit(content);
+        editorRef.current.clearEditor();
+      }
+    },
+    [isEditorEmpty, handleMessageSubmit]
+  );
 
   return (
     <form className="input-form" onSubmit={handleSubmission}>
