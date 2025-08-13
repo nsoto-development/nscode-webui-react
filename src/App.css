@@ -393,3 +393,87 @@ body {
   white-space: pre-wrap; /* Crucial for code blocks to wrap */
   word-break: break-all; /* Ensure long words break within the block */
 }
+
+.clear-chat-button {
+  /* 1️⃣ Fixed square – keep width & height identical */
+  width: 2.8rem;          /* ≈ 44.8 px */
+  height: 2.8rem;
+
+  /* 2️⃣ Force the square to stay a square even if borders/padding are added */
+  box-sizing: border-box;
+
+  /* 3️⃣ Remove any default padding / line‑height that could stretch it */
+  padding: 0;
+  line-height: 0;
+
+  /* 4️⃣ Center the “✕” (or any icon) inside the square */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* 5️⃣ Visual styling */
+  background: #e74c3c;    /* red – change to your brand colour if you wish */
+  color: #fff;
+  border: none;
+  border-radius: 50%;     /* makes the square a circle */
+  cursor: pointer;
+
+  /* 6️⃣ Icon size – independent of the circle size */
+  font-size: 1.4rem;      /* size of the “✕” */
+  
+  /* 7️⃣ Optional shadow for depth */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+
+  /* 8️⃣ Hover / focus animation */
+  transition: background 0.2s ease, transform 0.1s ease;
+
+  /* 9️⃣ Center it horizontally in the flow */
+  margin: 0.8rem auto;    /* auto left/right = centered */
+}
+
+/* Hover / focus / active states (same for both placements) */
+.clear-chat-button:hover,
+.clear-chat-button:focus,
+.floating-clear-chat:hover,
+.floating-clear-chat:focus {
+  background: #c0392b;    /* a shade darker */
+  transform: scale(1.07);
+}
+.clear-chat-button:active,
+.floating-clear-chat:active {
+  background: #a93226;
+  transform: scale(0.97);
+}
+
+/* -------------------------------------------------
+   CLEAR‑CHAT BUTTON – FLOATING (bottom‑right corner)
+   ------------------------------------------------- */
+.floating-clear-chat {
+  position: absolute;
+  right: 1rem;      /* keep the same horizontal offset */
+  top: 1rem;        /* <-- move it to the top instead of the bottom */
+  width: 2.8rem;
+  height: 2.8rem;
+  box-sizing: border-box;
+  padding: 0;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.4rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+/* -------------------------------------------------
+   ENSURE THE PARENT CAN POSITION THE FLOATING BUTTON
+   ------------------------------------------------- */
+.chat-window {
+  /* The floating button is absolutely positioned relative to this container */
+  position: relative;   /* add this line if it isn’t already there */
+}
