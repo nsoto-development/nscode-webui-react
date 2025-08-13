@@ -477,3 +477,17 @@ body {
   /* The floating button is absolutely positioned relative to this container */
   position: relative;   /* add this line if it isn’t already there */
 }
+
+/* Chat selector – sits just under the header */
+.chat-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.chat-selector select {
+  flex: 1;
+  padding: 0.4rem;
+}
+.chat-selector button {
+  padding: 0.4rem 0.8rem;
+}
