@@ -1,49 +1,49 @@
+// src/components/RichTextEditor.jsx
 import React, {
   useRef,
   useState,
   useEffect,
   forwardRef,
   useImperativeHandle,
-  useContext,
   useCallback,
   useMemo,
-} from 'react';
-import { LexicalComposer } from '@lexical/react/LexicalComposer';
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
-import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+} from "react";
+import { LexicalComposer } from "@lexical/react/LexicalComposer";
+import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { ContentEditable } from "@lexical/react/LexicalContentEditable";
+import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
+import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
   KEY_ENTER_COMMAND,
   $getRoot,
   $createParagraphNode,
   ParagraphNode,
-} from 'lexical';
-import { CodeNode } from '@lexical/code';
-import { ListItemNode, ListNode } from '@lexical/list';
-import { LinkNode } from '@lexical/link';
+} from "lexical";
+import { CodeNode } from "@lexical/code";
+import { ListItemNode, ListNode } from "@lexical/list";
+import { LinkNode } from "@lexical/link";
 import {
   TableCellNode,
   TableNode,
   TableRowNode,
-} from '@lexical/table';
-import { HeadingNode, QuoteNode } from '@lexical/rich-text';
-import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
+} from "@lexical/table";
+import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import {
   TRANSFORMERS,
   $convertToMarkdownString,
-} from '@lexical/markdown';
-import { ListPlugin } from '@lexical/react/LexicalListPlugin';
-import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
-import HtmlPlugin from './HtmlPlugin';
-import '../App.css';
-import { ChatContext } from '../context/ChatContext';
+} from "@lexical/markdown";
+import { ListPlugin } from "@lexical/react/LexicalListPlugin";
+import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
+import HtmlPlugin from "./HtmlPlugin";
+import "../App.css";
+import { useChat } from "../context/useChat";
 
 /* ---------- Theme & Nodes ---------- */
 const theme = {
-  code: 'editor-code-block',
-  paragraph: 'editor-paragraph',
-  placeholder: 'editor-placeholder',
+  code: "editor-code-block",
+  paragraph: "editor-paragraph",
+  placeholder: "editor-placeholder",
 };
 
 const editorNodes = [
@@ -68,7 +68,7 @@ const EmptyStatePlugin = ({ onUpdateEmptyState }) => {
       editor.getEditorState().read(() => {
         const root = $getRoot();
         const content = root.getTextContent();
-        onUpdateEmptyState(content.trim() === '');
+        onUpdateEmptyState(content.trim() === "");
       });
     };
     const remove = editor.registerUpdateListener(update);
@@ -111,19 +111,18 @@ const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
   useImperativeHandle(ref, () => ({
     /** Return markdown with a guaranteed language identifier */
     getMarkdown: () => {
-      let markdown = '';
+      let markdown = "";
       editor.getEditorState().read(() => {
-        // NOTE: $convertToMarkdownString signature is (transformers?, rootNode?, preserveNewLines?)
+        // $convertToMarkdownString signature: (transformers?, rootNode?, preserveNewLines?)
         markdown = $convertToMarkdownString(markdownTransformers, $getRoot());
       });
       // ---- NEW: inject fallback language when missing ----
       // Replace a fence that is immediately followed by a newline (i.e. ```\n) with ```plaintext\n
       markdown = markdown.replace(
         // ^\s*   → start of line + any indentation
-        // ```    → three back‑ticks
+        // ```   → three back‑ticks
         // (?=\r?\n) → look‑ahead that the next characters are a newline (no language token)
         /^\s*```(?=\r?\n)/gm,
-        // Preserve the original indentation (captured by \s*) and inject the language
         (match) => `${match}plaintext`
       );
       return markdown;
@@ -167,7 +166,7 @@ const MyLexicalEditor = forwardRef(({ onSubmit, onUpdateEmptyState }, ref) => {
 const MyLexicalEditorWithComposer = forwardRef(
   ({ onSubmit, onUpdateEmptyState }, ref) => {
     const initialConfig = {
-      namespace: 'my-chat-editor',
+      namespace: "my-chat-editor",
       theme,
       nodes: editorNodes,
       editorState: () => {
@@ -177,7 +176,7 @@ const MyLexicalEditorWithComposer = forwardRef(
         }
       },
       onError(error) {
-        console.error('Lexical editor error:', error);
+        console.error("Lexical editor error:", error);
       },
     };
 
@@ -195,7 +194,7 @@ const MyLexicalEditorWithComposer = forwardRef(
 
 /* ---------- Exported component ---------- */
 export default function RichTextEditor() {
-  const { isLoading, handleMessageSubmit } = useContext(ChatContext);
+  const { isLoading, handleMessageSubmit } = useChat();
   const editorRef = useRef(null);
   const [isEditorEmpty, setIsEditorEmpty] = useState(true);
 
@@ -208,7 +207,7 @@ export default function RichTextEditor() {
       e.preventDefault();
       if (!isEditorEmpty && editorRef.current) {
         const content = editorRef.current.getMarkdown();
-        console.log('📝 markdown payload →', content);
+        console.log("📝 markdown payload →", content);
         handleMessageSubmit(content);
         editorRef.current.clearEditor();
       }
@@ -230,7 +229,7 @@ export default function RichTextEditor() {
         disabled={isLoading || isEditorEmpty}
         className="send-button"
       >
-        {isLoading ? 'Sending...' : 'Send'}
+        {isLoading ? "Sending..." : "Send"}
       </button>
     </form>
   );

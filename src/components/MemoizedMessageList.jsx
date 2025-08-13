@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import "../App.css";
-import { ChatContext } from "../context/ChatContext";
+import { ChatContext } from "../context/ChatContext.jsx";
 
 // Helper function to copy text to the clipboard
 const copyToClipboard = async (text) => {
