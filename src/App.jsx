@@ -3,7 +3,7 @@ import './App.css';
 import { useCopyToClipboard } from './hooks/useCopyToClipboard';
 import MemoizedMessageList from './components/MemoizedMessageList';
 import RichTextEditor from './components/RichTextEditor';
-import { ChatContext } from './context/ChatContext';
+import { ChatContext } from './context/ChatContext.jsx';
 
 
 const defaultProfile = {
