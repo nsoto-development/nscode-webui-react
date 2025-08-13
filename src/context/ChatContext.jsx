@@ -12,17 +12,10 @@ export const ChatContext = createContext();
 const STORAGE_KEY = "nscode-chat-messages";
 const isBrowser = typeof window !== "undefined";
 
-/**
- * ChatProvider – the single source of truth for the chat UI.
- * It:
- *   • loads / saves `messages` from localStorage,
- *   • holds loading / error state,
- *   • exposes the `handleMessageSubmit` function (the API call you already had in App.jsx),
- *   • provides a `resetChat` helper.
- */
+/** Single source of truth for the chat UI. */
 export const ChatProvider = ({ children }) => {
   // -----------------------------------------------------------------
-  // 1️⃣  State + persistence
+  // 1️⃣ State + persistence
   // -----------------------------------------------------------------
   const [messages, setMessages] = useState(() => {
     if (!isBrowser) return [];
@@ -37,8 +30,6 @@ export const ChatProvider = ({ children }) => {
 
   const [isLoading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isCopied, setCopied] = useState(false); // optional UI flag
-  const [promptProfiles, setPromptProfiles] = useState(null);
 
   const agentApiUrl = import.meta.env.VITE_NSCODE_AGENT_ENDPOINT;
 
@@ -53,7 +44,7 @@ export const ChatProvider = ({ children }) => {
   }, [messages]);
 
   // -----------------------------------------------------------------
-  // 2️⃣  Helper: reset / clear chat
+  // 2️⃣ Helper: reset / clear chat
   // -----------------------------------------------------------------
   const resetChat = useCallback(() => {
     setMessages([]);
@@ -61,9 +52,9 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // -----------------------------------------------------------------
-  // 3️⃣  Core: submit a user message to the LLM endpoint
+  // 3️⃣ Core: submit a user message to the LLM endpoint
   // -----------------------------------------------------------------
-  const defaultProfile = {
+  const DEFAULT_PROFILE = {
     systemPrompt: "",
     max_output_tokens: 0,
     temperature: 0,
@@ -77,37 +68,18 @@ export const ChatProvider = ({ children }) => {
       setError(null);
 
       const userMessage = { role: "user", content: input };
-      const newMessages = [...messages, userMessage];
-      setMessages(newMessages);
 
-      // ---- decide which profile to use ---------------------------------
-      let activeProfile = defaultProfile;
-      if (promptProfiles) {
-        for (const profile of promptProfiles) {
-          const triggers = profile.when_it_fires
-            .split(/[–—,;]/)
-            .map((t) => t.trim().toLowerCase())
-            .filter(Boolean);
-          if (
-            triggers.some((t) =>
-              userMessage.content.toLowerCase().includes(t)
-            ) || profile.intent.toLowerCase() === "standard"
-          ) {
-            activeProfile = {
-              systemPrompt: profile.system_prompt,
-              max_output_tokens: profile.max_output_tokens,
-              temperature: profile.temperature,
-            };
-            break;
-          }
-        }
-      }
+      // Append the user message – functional update avoids stale closure
+      setMessages((prev) => [...prev, userMessage]);
 
-      // ---- call the backend -------------------------------------------
+      // No prompt‑profile logic needed – always use the default profile
+      const activeProfile = DEFAULT_PROFILE;
+
       try {
         const messagesWithSystemPrompt = [
           { role: "system", content: activeProfile.systemPrompt },
-          ...newMessages,
+          // Use the latest snapshot of messages (including the user message we just added)
+          ...[...messages, userMessage],
         ];
 
         const res = await fetch(agentApiUrl, {
@@ -127,25 +99,20 @@ export const ChatProvider = ({ children }) => {
 
         const data = await res.json();
         const assistantMessage = data.choices[0].message;
-        setMessages([...newMessages, assistantMessage]);
+
+        // Append the assistant reply – functional update again
+        setMessages((prev) => [...prev, assistantMessage]);
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     },
-    [
-      messages,
-      setLoading,
-      setError,
-      agentApiUrl,
-      promptProfiles,
-      defaultProfile,
-    ]
+    [agentApiUrl, messages] // only deps we really need
   );
 
   // -----------------------------------------------------------------
-  // 4️⃣  Provider value (memoised for performance)
+  // 4️⃣ Provider value (memoised for performance)
   // -----------------------------------------------------------------
   const value = useMemo(
     () => ({
@@ -153,25 +120,11 @@ export const ChatProvider = ({ children }) => {
       setMessages,
       isLoading,
       error,
-      isCopied,
-      setCopied,
-      promptProfiles,
-      setPromptProfiles,
       handleMessageSubmit,
       resetChat,
     }),
-    [
-      messages,
-      isLoading,
-      error,
-      isCopied,
-      promptProfiles,
-      handleMessageSubmit,
-      resetChat,
-    ]
+    [messages, isLoading, error, handleMessageSubmit, resetChat]
   );
 
-  return (
-    <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
-  );
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
