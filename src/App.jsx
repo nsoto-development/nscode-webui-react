@@ -30,13 +30,15 @@ function App() {
         <RichTextEditor onSubmit={handleMessageSubmit} />
 
         {/* Clear‑Chat button – clears only the currently selected chat */}
-        <button
-          className="clear-chat-button"
-          onClick={resetChat}
-          disabled={copied}
-        >
-          Clear Chat
-        </button>
+          <button
+            type="button"
+            className="floating-clear-chat"
+            onClick={resetChat}
+            title="Clear chat history"
+            disabled={copied}
+          >
+            ✕
+          </button>
       </div>
 
       {error && <p className="error-message">Error: {error}</p>}
