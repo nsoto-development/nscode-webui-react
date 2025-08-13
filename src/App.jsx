@@ -4,17 +4,17 @@ import "./App.css";
 import { useCopyToClipboard } from "./hooks/useCopyToClipboard";
 import MemoizedMessageList from "./components/MemoizedMessageList";
 import RichTextEditor from "./components/RichTextEditor";
+import ChatSelector from "./components/ChatSelector";
 import { useChat } from "./context/useChat";
 
 function App() {
   const {
-    messages,
-    isLoading,
     error,
     handleMessageSubmit,
-    resetChat,
+    resetChat, // clears only the active chat
   } = useChat();
 
+  // copy‑to‑clipboard hook (kept for any UI that needs it)
   const [copied, copy] = useCopyToClipboard();
 
   return (
@@ -22,20 +22,21 @@ function App() {
       <div className="chat-window">
         <h1 className="chat-header">LLM Test Interface</h1>
 
+        {/* NEW – chat selector */}
+        <ChatSelector />
+
+        {/* Message list and editor read from the global context */}
         <MemoizedMessageList />
         <RichTextEditor onSubmit={handleMessageSubmit} />
 
-        {/* ---- Floating Clear‑Chat button ---- */}
-        {messages.length > 0 && (
-          <button
-            type="button"
-            className="floating-clear-chat"
-            onClick={resetChat}
-            title="Clear chat history"
-          >
-            ✕
-          </button>
-        )}
+        {/* Clear‑Chat button – clears only the currently selected chat */}
+        <button
+          className="clear-chat-button"
+          onClick={resetChat}
+          disabled={copied}
+        >
+          Clear Chat
+        </button>
       </div>
 
       {error && <p className="error-message">Error: {error}</p>}
