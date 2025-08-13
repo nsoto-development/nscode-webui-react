@@ -15,7 +15,7 @@ import { localStorageStore } from "../store/localStorageStore";
    Choose which store to use – controlled by env flag
    ------------------------------------------------- */
 const store =
-  import.meta.env.VITE_USE_COSMOS === "true" && cosmosStore
+  import.meta.env.VITE_USE_COSMOSDB === "true" && cosmosStore
     ? cosmosStore
     : localStorageStore;
 
