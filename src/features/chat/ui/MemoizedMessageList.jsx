@@ -5,22 +5,23 @@ import React, {
   useCallback,
   useMemo,
   useState,
-  useContext,
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import "../App.css";
-import { ChatContext } from "../context/ChatContext.jsx";
+import "../../../styles/App.css";
+import { useChat } from "../hooks/useChat";
 
-// Helper function to copy text to the clipboard
+/* -----------------------------------------------------------------
+   Helper function to copy text to the clipboard
+   ----------------------------------------------------------------- */
 const copyToClipboard = async (text) => {
   if (navigator?.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
-      // fall-through to legacy method
+      // fall‑through to legacy method
     }
   }
 
@@ -39,7 +40,9 @@ const copyToClipboard = async (text) => {
   }
 };
 
-// SVG for the copy icon
+/* -----------------------------------------------------------------
+   SVG for the copy icon
+   ----------------------------------------------------------------- */
 const CopyIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -53,16 +56,16 @@ const CopyIcon = () => (
   </svg>
 );
 
-// Memoized UI for fenced code blocks
+/* -----------------------------------------------------------------
+   Memoized UI for fenced code blocks
+   ----------------------------------------------------------------- */
 const CodeBlock = memo(({ className, children, copyHandler, id, copiedId }) => {
   const language = className?.replace("language-", "") || "text";
   const isCopied = copiedId === id;
 
   const handleCopy = useCallback(() => {
-    // ReactMarkdown's 'children' prop can be an array of objects
-    // We need to join the text content properly
-    const codeContent = Array.isArray(children) 
-      ? children.map(child => typeof child === 'string' ? child : child.props.children).join('')
+    const codeContent = Array.isArray(children)
+      ? children.map((child) => (typeof child === "string" ? child : child.props.children)).join("")
       : children.toString();
     copyHandler(codeContent, id);
   }, [children, copyHandler, id]);
@@ -86,9 +89,13 @@ const CodeBlock = memo(({ className, children, copyHandler, id, copiedId }) => {
   );
 });
 
-// The main component that renders the chat
+/* -----------------------------------------------------------------
+   The main component that renders the chat
+   ----------------------------------------------------------------- */
 const MemoizedMessageList = memo(() => {
-  const { messages, isLoading } = useContext(ChatContext);
+  // <-- use the hook instead of useContext(ChatContext)
+  const { messages, isLoading } = useChat();
+
   const messagesEndRef = useRef(null);
   const prevLength = useRef(messages.length);
   const [copiedId, setCopiedId] = useState(null);
@@ -104,9 +111,7 @@ const MemoizedMessageList = memo(() => {
     const success = await copyToClipboard(text);
     if (success) {
       setCopiedId(id);
-      setTimeout(() => {
-        setCopiedId(null);
-      }, 2000);
+      setTimeout(() => setCopiedId(null), 2000);
     } else {
       alert("Copy failed - please try again.");
     }
@@ -120,12 +125,12 @@ const MemoizedMessageList = memo(() => {
         rehypeSanitize,
         {
           ...defaultSchema,
-          tagNames: [...defaultSchema.tagNames, 'input'],
+          tagNames: [...defaultSchema.tagNames, "input"],
           attributes: {
             ...defaultSchema.attributes,
-            input: ['type', 'checked', 'disabled'],
-            code: ['className']
-          }
+            input: ["type", "checked", "disabled"],
+            code: ["className"],
+          },
         },
       ],
     ],
@@ -153,9 +158,7 @@ const MemoizedMessageList = memo(() => {
                       if (!className) {
                         return <code className="inline-code">{children}</code>;
                       }
-
                       const codeBlockId = `code-${messageId}-${className}`;
-
                       return (
                         <CodeBlock
                           className={className}

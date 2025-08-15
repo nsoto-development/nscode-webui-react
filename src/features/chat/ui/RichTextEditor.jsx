@@ -36,8 +36,8 @@ import {
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
 import HtmlPlugin from "./HtmlPlugin";
-import "../App.css";
-import { useChat } from "../context/useChat";
+import "../../../styles/App.css";
+import { useChat } from "../hooks/useChat";  
 
 /* ---------- Theme & Nodes ---------- */
 const theme = {
