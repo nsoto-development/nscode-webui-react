@@ -67,12 +67,18 @@ export const chatServiceFactory = (repo) => ({
         content: "[No response]",
       };
 
-    // 4️⃣ Return the updated chat (provider will persist it)
+    // 4️⃣ Build the updated chat (includes the assistant reply)
     const updatedChat = {
       ...chat,
       messages: [...chat.messages, assistantMsg],
       meta: { ...chat.meta, updatedAt: Date.now() },
     };
+
+    // 5️⃣ **Persist the updated chat** – this guarantees the assistant
+    //    message is written to the underlying store (localStorage or Cosmos).
+    await repo.saveChat(updatedChat);
+
+    // 6️⃣ Return the persisted chat to the provider (so UI can update instantly)
     return updatedChat;
   },
 
