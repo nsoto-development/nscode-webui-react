@@ -20,16 +20,16 @@ export const apiClient = {
     };
 
     // ---- token‑budget guard (client‑side) ----
-    if (tokenBudget.maxInputTokens) {
-      const approxTokens = Math.ceil(JSON.stringify(body).length / 4);
-      if (approxTokens > tokenBudget.maxInputTokens) {
-        throw {
-          status: 400,
-          code: "TOKEN_BUDGET_EXCEEDED",
-          message: `Payload exceeds ${tokenBudget.maxInputTokens} tokens`,
-        };
-      }
-    }
+    // if (tokenBudget.maxInputTokens) {
+    //   const approxTokens = Math.ceil(JSON.stringify(body).length / 4);
+    //   if (approxTokens > tokenBudget.maxInputTokens) {
+    //     throw {
+    //       status: 400,
+    //       code: "TOKEN_BUDGET_EXCEEDED",
+    //       message: `Payload exceeds ${tokenBudget.maxInputTokens} tokens`,
+    //     };
+    //   }
+    // }
 
     // ---- retry loop ----
     for (let attempt = 0; attempt <= retries; attempt++) {
