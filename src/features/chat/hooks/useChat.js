@@ -1,11 +1,7 @@
-// src/context/useChat.js
+// src/features/chat/hooks/useChat.js
 import { useContext } from "react";
-import { ChatContext } from "./ChatContext.jsx";
+import { ChatContext } from "../../../app/providers/ChatProvider.jsx";
 
-/**
- * Small wrapper that throws a clear error if a component tries to
- * consume the context outside of <ChatProvider>.
- */
 export const useChat = () => {
   const ctx = useContext(ChatContext);
   if (!ctx) {
