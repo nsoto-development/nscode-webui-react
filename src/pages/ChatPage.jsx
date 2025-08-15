@@ -5,7 +5,7 @@ import { useChat } from "../features/chat/hooks/useChat";
 import ChatSelector from "../features/chat/ui/ChatSelector";
 import MemoizedMessageList from "../features/chat/ui/MemoizedMessageList";
 import RichTextEditor from "../features/chat/ui/RichTextEditor";
-import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
+import { useCopyToClipboard } from "../features/chat/hooks/useCopyToClipboard";
 
 export default function ChatPage() {
   const {
