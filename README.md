@@ -1,6 +1,7 @@
 # nscode‑webui‑react — Test Harness for **nscode‑agent‑func** (Azure Functions v2)
 
-A tiny React UI that lets you experiment with the private Azure Function wrapper (`CodeAgentFunction/v1/chat/completions`).  
+A tiny React UI that lets you experiment with the private Azure Function wrapper  
+`CodeAgentFunction/v1/chat/completions`.  
 It sends OpenAI‑compatible chat requests, receives the response, and displays the conversation.
 
 ---  
@@ -22,12 +23,15 @@ It sends OpenAI‑compatible chat requests, receives the response, and displays 
 ## Features
 | ✅ | Description |
 |---|-------------|
-| **OpenAI‑compatible** | Sends the same JSON payload the Azure Function expects (`model`, `messages`, `max_tokens`, …). |
-| **Rich‑text editor** | Lexical‑based editor with markdown, code‑block support and *Enter*‑to‑send. |
+| **OpenAI‑compatible** | Sends the exact JSON payload the Azure Function expects (`model`, `messages`, `max_tokens`, …). |
+| **Rich‑text editor** | Lexical‑based editor with markdown, code‑block support and **Enter‑to‑send**. |
 | **Copy‑to‑clipboard** | One‑click copy of assistant replies. |
 | **Prompt‑profile handling** | Mirrors the intent‑profile logic used in the Azure Function (brief, standard, deep, design, review, default). |
 | **Error display** | Shows OpenAI‑style error objects returned by the function. |
 | **Zero‑config dev server** | Vite dev server with hot‑reload. |
+| **Clean‑architecture layout** | UI → feature‑scoped hooks → service → repository → infrastructure. |
+| **Local‑storage persistence only** | The client stores chats in `localStorage`; no Cosmos DB SDK or keys are shipped to the browser. |
+| **Token‑budget removed (for now)** | The token‑budget guard has been stripped out to simplify the flow; it can be re‑added later if needed. |
 
 ---  
 
@@ -56,19 +60,20 @@ npm run build   # outputs to ./dist
 ---  
 
 ## Configuration
-The UI reads the Azure Function endpoint from an environment variable at build time.
+The UI reads the Azure Function endpoint from an environment variable at **build time**.
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `VITE_NSCODE_AGENT_ENDPOINT` | ✅ | `https://my-func-app.azurewebsites.net/api/CodeAgentFunction/v1/chat/completions` |
+| `VITE_NSCODE_AGENT_ENDPOINT` | ✅ | `http://localhost:7071/CodeAgentFunction/` |
 
-Create a `.env` file in the project root (Vite automatically prefixes with `VITE_`):
+Create a `.env` file in the project root (Vite automatically prefixes variables with `VITE_`):
 
 ```dotenv
-VITE_NSCODE_AGENT_ENDPOINT=https://my-func-app.azurewebsites.net/api/CodeAgentFunction/v1/chat/completions
+VITE_NSCODE_AGENT_ENDPOINT=http://localhost:7071/CodeAgentFunction/
 ```
 
-> **Note** – The Azure Function itself handles intent detection, per‑intent parameters, and OpenAI‑compatible responses. The UI only forwards the request.
+> **Note** – The endpoint should point **only to the function root**.  
+> The OpenAI‑compatible path (`v1/chat/completions`) is supplied by the client when it calls the API.
 
 ---  
 
@@ -77,46 +82,84 @@ VITE_NSCODE_AGENT_ENDPOINT=https://my-func-app.azurewebsites.net/api/CodeAgentFu
 npm run dev
 ```
 
-Open <http://localhost:5173> (or the URL shown in the console).  
+Open <http://localhost:5173> (or the URL shown in the console).
 
 * Type a message → **Enter** (or click **Send**).  
-* Use triple back‑ticks (```` ``` ````) to start a code‑block mode.  
+* Use triple back‑ticks (```` ``` ````) to start a code‑block.  
 * Assistant replies appear below; click the clipboard icon to copy.
 
 ---  
 
 ## Project Layout
 ```
+public/
 src/
-├─ components/
-│   ├─ MemoizedMessageList.jsx   # renders chat history
-│   ├─ RichTextEditor.jsx        # Lexical editor + plugins
-│   └─ ChatInput.jsx             # fallback textarea input
-├─ context/
-│   └─ ChatContext.jsx           # global state (messages, loading, errors)
-├─ hooks/
-│   └─ useCopyToClipboard.jsx    # clipboard helper
-├─ App.jsx                       # core logic – builds OpenAI request, calls endpoint
-├─ main.jsx                      # Vite entry point
-└─ index.css / App.css           # minimal styling
+├─ app/
+│   ├─ index.jsx                     # Vite entry point (bootstrap)
+│   └─ providers/
+│       └─ ChatProvider.jsx          # DI container + UI state, uses only localStorageStore
+│
+├─ assets/                           # static assets (icons, images, etc.)
+│
+├─ features/
+│   └─ chat/
+│       ├─ hooks/
+│       │   ├─ useChat.js
+│       │   └─ useCopyToClipboard.js
+│       ├─ models/                  # (optional) type definitions or schemas
+│       ├─ services/
+│       │   ├─ chatRepository.js    # thin wrapper around the chosen store
+│       │   └─ chatService.js       # business use‑cases (sendMessage, createChat, …)
+│       └─ ui/
+│           ├─ ChatSelector.jsx
+│           ├─ HtmlPlugin.jsx
+│           ├─ MemoizedMessageList.jsx
+│           └─ RichTextEditor.jsx
+│
+├─ infrastructure/
+│   ├─ api/
+│   │   └─ apiClient.js              # central fetch wrapper (retries, unified errors)
+│   ├─ storage/
+│   │   ├─ cosmosStore.js            # present in the repo (currently unused)
+│   │   └─ localStorageStore.js      # persistence in browser localStorage
+│   └─ utils/                        # misc utilities (e.g., ErrorBoundary)
+│
+├─ pages/
+│   └─ ChatPage.jsx                 # page component that composes the UI
+│
+├─ styles/
+│   ├─ App.css
+│   └─ index.css
+│
+├─ index.html
+├─ vite.config.js
+├─ eslint.config.js
+├─ package.json
+└─ README.md
 ```
+
+### What changed from the original scaffold
+* **`cosmosStore.js` remains in the repository** (it is currently unused by the front‑end).  
+* **`ChatProvider.jsx` lives under `src/app/providers/`** and is the only place that wires the store, repository, and service together.  
+* **`useChat` is now feature‑scoped** (`src/features/chat/hooks/useChat.js`) and reads from the `ChatContext` exported by `ChatProvider`.  
+* **`apiClient.post` no longer receives a token‑budget object**; callers simply pass the path (`"v1/chat/completions"`) and the payload.  
+* **The UI now follows a clean‑architecture folder layout** (presentation → feature → services → infrastructure).  
 
 ---  
 
 ## Available Scripts
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | Starts Vite dev server (hot‑reload). |
+| `npm run dev` | Starts Vite dev server with hot‑reload. |
 | `npm run build` | Produces a production bundle in `dist/`. |
-| `npm run preview` | Serves the production build locally. |
 | `npm run lint` | Runs ESLint (React + JSX). |
-| `npm test` | Placeholder – add Jest / React Testing Library tests. |
+| `npm run preview` | Serves the production build locally. |
 
 ---  
 
 ## Testing
 ```bash
-# Install dev deps (if not already)
+# Install dev dependencies (if not already)
 npm i -D @testing-library/react @testing-library/jest-dom jest
 
 # Run tests
