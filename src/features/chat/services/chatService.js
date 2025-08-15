@@ -28,7 +28,7 @@ export const chatServiceFactory = (repo) => ({
   },
 
   // -----------------------------------------------------------------
-  // 4️⃣ Send a user message to the LLM
+  // 4️⃣ Send a user message to the LLM (OpenAI‑compatible endpoint)
   // -----------------------------------------------------------------
   /**
    * @param {Object} params
@@ -40,45 +40,44 @@ export const chatServiceFactory = (repo) => ({
     // 1️⃣ Get the current chat (repository helper)
     const chat = await repo.getChat(chatId);
 
-    // 2️⃣ Build the payload for the LLM
+    // 2️⃣ Build the payload exactly as the OpenAI chat‑completion API expects
     const payload = [
       { role: "system", content: profile.systemPrompt },
       ...chat.messages,
       { role: "user", content: input },
     ];
 
-    // 3️⃣ Call the Azure Function via the central client
+    // 3️⃣ Call the Azure Function via the central client.
+    //    The path supplied here is the OpenAI‑compatible part.
     const resp = await apiClient.post(
-      "/",
+      "v1/chat/completions", 
       {
         model: "test-model",
         messages: payload,
         max_tokens: profile.max_output_tokens,
         temperature: profile.temperature,
-      },
-      {
-        tokenBudget: { maxInputTokens: 1500, maxOutputTokens: 800 },
       }
+      // No tokenBudget option any more
     );
 
+    // 4️⃣ Extract the assistant reply (fallback if the model returns nothing)
     const assistantMsg =
       resp.choices?.[0]?.message ?? {
         role: "assistant",
         content: "[No response]",
       };
 
-    // 4️⃣ Build the updated chat (includes the assistant reply)
+    // 5️⃣ Build the updated chat (assistant message appended)
     const updatedChat = {
       ...chat,
       messages: [...chat.messages, assistantMsg],
       meta: { ...chat.meta, updatedAt: Date.now() },
     };
 
-    // 5️⃣ **Persist the updated chat** – this guarantees the assistant
-    //    message is written to the underlying store (localStorage or Cosmos).
+    // 6️⃣ Persist the updated chat – guarantees the assistant reply is saved
     await repo.saveChat(updatedChat);
 
-    // 6️⃣ Return the persisted chat to the provider (so UI can update instantly)
+    // 7️⃣ Return the persisted chat so the provider can update UI instantly
     return updatedChat;
   },
 
