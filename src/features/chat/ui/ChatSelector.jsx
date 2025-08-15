@@ -1,6 +1,6 @@
 // src/components/ChatSelector.jsx
 import React from "react";
-import { useChat } from "../context/useChat";
+import { useChat } from "../hooks/useChat";  
 
 export default function ChatSelector() {
   const {
