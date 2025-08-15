@@ -49,7 +49,7 @@ export const chatServiceFactory = (repo) => ({
 
     // 3️⃣ Call the Azure Function via the central client
     const resp = await apiClient.post(
-      "/prompt",
+      "/",
       {
         model: "test-model",
         messages: payload,
