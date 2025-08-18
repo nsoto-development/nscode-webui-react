@@ -11,17 +11,10 @@ import { chatServiceFactory } from "../../features/chat/services/chatService";
 import { chatRepositoryFactory } from "../../features/chat/services/chatRepository";
 
 import { localStorageStore } from "../../infrastructure/storage/localStorageStore";
-import { cosmosStore } from "../../infrastructure/storage/cosmosStore";
+import { cosmosStore } from "../../infrastructure/storage/cosmosStore"; 
 
-/* -------------------------------------------------
-   Export the context – UI components will consume it
-   via the feature‑scoped `useChat` hook.
-   ------------------------------------------------- */
 export const ChatContext = createContext(null);
 
-/* -------------------------------------------------
-   ChatProvider – DI container + UI state
-   ------------------------------------------------- */
 export const ChatProvider = ({ children }) => {
   /* ---------- 0️⃣ Choose storage (env flag) ---------- */
   const store =
@@ -33,7 +26,7 @@ export const ChatProvider = ({ children }) => {
   const repository = useMemo(() => chatRepositoryFactory(store), [store]);
   const chatService = useMemo(() => chatServiceFactory(repository), [repository]);
 
-  /* ---------- 2️⃣ UI state (same as old ChatContext) ---------- */
+  /* ---------- 2️⃣ UI state ---------- */
   const [chats, setChats] = useState({});
   const [activeChatId, setActiveChatId] = useState(null);
   const [isLoading, setLoading] = useState(false);
@@ -71,14 +64,15 @@ export const ChatProvider = ({ children }) => {
     }
   }
 
-  /* ---------- 4️⃣ Load chats on mount (migration runs first) ---------- */
+  /* ---------- 4️⃣ Load chats on mount ---------- */
   useEffect(() => {
     (async () => {
       await migrateLegacyIfNeeded();
       setLoading(true);
       try {
-        const map = await repository.loadChats();
+        const map = await repository.loadChats(); // { id → { meta, messages } }
         setChats(map);
+
         const ids = Object.keys(map);
         if (ids.length) {
           const latest = ids.reduce((a, b) =>
@@ -96,9 +90,43 @@ export const ChatProvider = ({ children }) => {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repository]);
 
-  /* ---------- 5️⃣ Helper – persist a single chat (optimistic UI) ---------- */
+  /* ---------- 5️⃣ Load messages only when the active chat changes ---------- */
+  useEffect(() => {
+    if (!activeChatId) return;
+
+    // Skip fetch if we already have messages (local‑storage case)
+    if (chats[activeChatId]?.messages?.length) return;
+
+    // Guard – not all stores implement loadMessages (localStorageStore doesn’t)
+    if (typeof repository.loadMessages !== "function") return;
+
+    // Ensure we fetch each chat only once per component lifetime
+    const fetched = new Set(); // plain Set – no TypeScript generic syntax
+    if (fetched.has(activeChatId)) return;
+    fetched.add(activeChatId);
+
+    (async () => {
+      try {
+        const msgs = await repository.loadMessages(activeChatId);
+        setChats((prev) => ({
+          ...prev,
+          [activeChatId]: {
+            ...prev[activeChatId],
+            messages: msgs,
+          },
+        }));
+      } catch (e) {
+        console.warn("[ChatProvider] loadMessages failed:", e);
+        setError(e.message ?? "Failed to load messages");
+      }
+    })();
+    // Only re‑run when the active chat ID changes
+  }, [activeChatId, repository]);
+
+  /* ---------- 6️⃣ Persist a single chat (optimistic UI) ---------- */
   const persistChat = useCallback(
     async (chat) => {
       try {
@@ -111,7 +139,6 @@ export const ChatProvider = ({ children }) => {
     [repository]
   );
 
-  /* ---------- 6️⃣ Action helpers (now delegate to chatService) ---------- */
   const handleMessageSubmit = useCallback(
     async (input) => {
       if (!input?.trim() || !activeChatId) return;
@@ -119,44 +146,54 @@ export const ChatProvider = ({ children }) => {
       setLoading(true);
       setError(null);
 
-      const userMsg = { role: "user", content: input };
+      // -------------------------------------------------
+      // 1️⃣ Optimistic UI – add the user message locally
+      // -------------------------------------------------
+      const userMsg = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: input,
+      };
       const chat = chats[activeChatId];
-
-      // Optimistic UI – add the user message locally first
       const chatWithUser = {
         ...chat,
         messages: [...chat.messages, userMsg],
         meta: { ...chat.meta, updatedAt: Date.now() },
       };
+
+      // Persist the *chat meta* (unchanged)
       await persistChat(chatWithUser);
 
-      // -----------------------------------------------------------------
-      //  👉 NEW: call the LLM via the **service** (which uses apiClient)
-      // -----------------------------------------------------------------
+      // This writes to the `messages` container in Cosmos (or the in‑memory map for localStorage)
+      await repository.saveMessage(activeChatId, userMsg);
+
+      // -------------------------------------------------
+      // 2️⃣ Call the LLM via the service (which also persists the assistant reply)
+      // -------------------------------------------------
       try {
         const finalChat = await chatService.sendMessage({
           chatId: activeChatId,
           input,
           profile: {
-            systemPrompt: "",          // expose later if you want a system prompt UI
+            systemPrompt: "",
             max_output_tokens: 0,
             temperature: 0,
           },
         });
 
-        // Service returns the full updated chat (assistant reply already added)
+        // The service returns the full updated chat (user + assistant messages)
         setChats((prev) => ({
           ...prev,
           [finalChat.meta.id]: finalChat,
         }));
       } catch (e) {
-        // `chatService` propagates the unified error shape from apiClient
+        // chatService propagates the unified error shape from apiClient
         setError(e.message ?? "Failed to send message");
       } finally {
         setLoading(false);
       }
     },
-    [activeChatId, chats, persistChat, chatService]
+    [activeChatId, chats, persistChat, chatService, repository]
   );
 
   const resetChat = useCallback(async () => {
@@ -169,10 +206,18 @@ export const ChatProvider = ({ children }) => {
     await persistChat(empty);
   }, [activeChatId, chats, persistChat]);
 
+  // -----------------------------------------------------------------
+  // 8️⃣ Create a new chat – **wait for the server before activating**
+  // -----------------------------------------------------------------
   const createChat = useCallback(
     async (title = "New chat") => {
+      // 1️⃣ Build a brand‑new empty chat locally
       const newChat = repository.createEmptyChat(title);
+
+      // 2️⃣ Persist it on the back‑end (cosmosStore.saveChat will POST the raw chat)
       await persistChat(newChat);
+
+      // 3️⃣ Now that the chat definitely exists on the server, make it active
       setActiveChatId(newChat.meta.id);
     },
     [persistChat, repository]
@@ -198,7 +243,7 @@ export const ChatProvider = ({ children }) => {
     [activeChatId, chats, repository]
   );
 
-  /* ---------- 7️⃣ Context value – what UI consumes ---------- */
+  /* ---------- 9️⃣ Context value ---------- */
   const value = useMemo(
     () => ({
       chats,

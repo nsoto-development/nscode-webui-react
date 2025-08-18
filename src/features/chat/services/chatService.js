@@ -1,10 +1,6 @@
 // src/features/chat/services/chatService.js
 import { apiClient } from "../../../infrastructure/api/apiClient";
 
-/**
- * Factory – receives a repository (the object created by chatRepositoryFactory)
- * and returns an object exposing the business operations the UI needs.
- */
 export const chatServiceFactory = (repo) => ({
   // -----------------------------------------------------------------
   // 1️⃣ Load all chats (used on app start)
@@ -37,47 +33,63 @@ export const chatServiceFactory = (repo) => ({
    *   - profile: { systemPrompt, max_output_tokens, temperature }
    */
   async sendMessage({ chatId, input, profile }) {
-    // 1️⃣ Get the current chat (repository helper)
+    // 1️⃣ Get the current chat (including its existing messages)
     const chat = await repo.getChat(chatId);
 
-    // 2️⃣ Build the payload exactly as the OpenAI chat‑completion API expects
+    // 2️⃣ Build the OpenAI‑compatible payload
     const payload = [
       { role: "system", content: profile.systemPrompt },
       ...chat.messages,
       { role: "user", content: input },
     ];
 
-    // 3️⃣ Call the Azure Function via the central client.
-    //    The path supplied here is the OpenAI‑compatible part.
+    // 3️⃣ Call the Azure Function – **no extra version segment**
     const resp = await apiClient.post(
-      "v1/chat/completions", 
+      "chat/completions", // <-- correct path (env already contains /v1)
       {
         model: "test-model",
         messages: payload,
         max_tokens: profile.max_output_tokens,
         temperature: profile.temperature,
       }
-      // No tokenBudget option any more
     );
 
-    // 4️⃣ Extract the assistant reply (fallback if the model returns nothing)
-    const assistantMsg =
-      resp.choices?.[0]?.message ?? {
-        role: "assistant",
-        content: "[No response]",
-      };
+    // 4️⃣ Normalise the assistant reply (covers a few shapes)
+    let assistantMsg = null;
 
-    // 5️⃣ Build the updated chat (assistant message appended)
+    // OpenAI‑compatible shape
+    if (resp?.choices?.[0]?.message) {
+      assistantMsg = resp.choices[0].message;
+    }
+
+    // Some wrappers return the message directly under choices[0]
+    if (!assistantMsg && resp?.choices?.[0]) {
+      const maybe = resp.choices[0];
+      if (maybe.role && maybe.content) {
+        assistantMsg = maybe;
+      }
+    }
+
+    // Fallback placeholder – guarantees UI never crashes
+    assistantMsg = assistantMsg ?? {
+      role: "assistant",
+      content: "[No response]",
+    };
+
+    // 5️⃣ Persist the assistant message in the *messages* container
+    await repo.saveMessage(chatId, assistantMsg);
+
+    // 6️⃣ Build the updated chat (includes the new message)
     const updatedChat = {
       ...chat,
       messages: [...chat.messages, assistantMsg],
       meta: { ...chat.meta, updatedAt: Date.now() },
     };
 
-    // 6️⃣ Persist the updated chat – guarantees the assistant reply is saved
+    // 7️⃣ Persist the chat meta (updatedAt) – optional but keeps timestamps in sync
     await repo.saveChat(updatedChat);
 
-    // 7️⃣ Return the persisted chat so the provider can update UI instantly
+    // 8️⃣ Return the updated chat so the provider can update UI instantly
     return updatedChat;
   },
 
