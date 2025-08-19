@@ -76,6 +76,11 @@ export const chatServiceFactory = (repo) => ({
       content: "[No response]",
     };
 
+    // ---- Ensure a unique id for the assistant message ----
+    if (!assistantMsg.id) {
+      assistantMsg.id = crypto.randomUUID();
+    }
+
     // 5️⃣ Persist the assistant message in the *messages* container
     await repo.saveMessage(chatId, assistantMsg);
 
