@@ -11,7 +11,7 @@ import { chatServiceFactory } from "../../features/chat/services/chatService";
 import { chatRepositoryFactory } from "../../features/chat/services/chatRepository";
 
 import { localStorageStore } from "../../infrastructure/storage/localStorageStore";
-import { cosmosStore } from "../../infrastructure/storage/cosmosStore"; 
+import { cosmosStore } from "../../infrastructure/storage/cosmosStore";
 
 export const ChatContext = createContext(null);
 
@@ -161,14 +161,17 @@ export const ChatProvider = ({ children }) => {
         meta: { ...chat.meta, updatedAt: Date.now() },
       };
 
-      // Persist the *chat meta* (unchanged)
-      await persistChat(chatWithUser);
+      // Update UI state immediately
+      setChats((prev) => ({
+        ...prev,
+        [activeChatId]: chatWithUser,
+      }));
 
-      // This writes to the `messages` container in Cosmos (or the in‑memory map for localStorage)
+      // Persist the new message **once** (localStorage or Cosmos)
       await repository.saveMessage(activeChatId, userMsg);
 
       // -------------------------------------------------
-      // 2️⃣ Call the LLM via the service (which also persists the assistant reply)
+      // 2️⃣ Call the LLM via the service (assistant reply)
       // -------------------------------------------------
       try {
         const finalChat = await chatService.sendMessage({
@@ -181,19 +184,18 @@ export const ChatProvider = ({ children }) => {
           },
         });
 
-        // The service returns the full updated chat (user + assistant messages)
+        // The service returns the full updated chat (user + assistant)
         setChats((prev) => ({
           ...prev,
           [finalChat.meta.id]: finalChat,
         }));
       } catch (e) {
-        // chatService propagates the unified error shape from apiClient
         setError(e.message ?? "Failed to send message");
       } finally {
         setLoading(false);
       }
     },
-    [activeChatId, chats, persistChat, chatService, repository]
+    [activeChatId, chats, chatService, repository] // persistChat removed
   );
 
   const resetChat = useCallback(async () => {
