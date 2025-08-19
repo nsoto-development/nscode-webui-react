@@ -15,7 +15,7 @@ export const chatRepositoryFactory = (store) => ({
     // ---------- 1️⃣ Get the meta document ----------
     let meta;
     if (typeof store.getChat === "function") {
-      meta = await store.getChat(chatId);          // flat chat document
+      meta = await store.getChat(chatId); // flat chat document
     } else {
       // Fallback – load all chats and pick the one we need (localStorage)
       const map = await store.loadChats();
@@ -44,7 +44,14 @@ export const chatRepositoryFactory = (store) => ({
   // ---- Load messages for a chat (used by ChatProvider) ---------------
   async loadMessages(chatId) {
     if (typeof store.loadMessages === "function") {
-      return store.loadMessages(chatId);
+      const msgs = await store.loadMessages(chatId);
+      // ---- Defensive deduplication by id ----
+      const seen = new Set();
+      return msgs.filter((m) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
     }
     // localStorage keeps messages inside the chat object, so just return []
     return [];
