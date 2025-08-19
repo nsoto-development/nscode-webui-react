@@ -1,4 +1,4 @@
-// src/store/localStorageStore.js
+// src/infrastructure/storage/localStorageStore.js
 import { v4 as uuidv4 } from "uuid";
 
 const STORAGE_KEY = "nscode-multi-chats";
@@ -49,5 +49,21 @@ export const localStorageStore = {
       },
       messages: [],
     };
+  },
+
+  // ---- New helper: save a single message (used by the repository) ----
+  async saveMessage(chatId, message) {
+    const map = readAll();
+    const chat = map[chatId];
+    if (!chat) throw new Error(`Chat ${chatId} not found`);
+
+    // Ensure the message has an id before pushing
+    if (!message.id) {
+      message.id = crypto.randomUUID ? crypto.randomUUID() : uuidv4();
+    }
+
+    chat.messages.push(message);
+    writeAll(map);
+    return chat;
   },
 };
