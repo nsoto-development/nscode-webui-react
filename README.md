@@ -139,7 +139,7 @@ src/
 ```
 
 ### What changed from the original scaffold
-* **`cosmosStore.js` remains in the repository** (it is currently unused by the front‑end).  
+* **`cosmosStore.js` now utilized primariy for chat persistence.  
 * **`ChatProvider.jsx` lives under `src/app/providers/`** and is the only place that wires the store, repository, and service together.  
 * **`useChat` is now feature‑scoped** (`src/features/chat/hooks/useChat.js`) and reads from the `ChatContext` exported by `ChatProvider`.  
 * **`apiClient.post` no longer receives a token‑budget object**; callers simply pass the path (`"v1/chat/completions"`) and the payload.  
