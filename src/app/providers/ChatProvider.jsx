@@ -80,7 +80,14 @@ export const ChatProvider = ({ children }) => {
           );
           setActiveChatId(latest);
         } else {
+          // ---- NEW: create **and persist** the first chat ----
           const fresh = repository.createEmptyChat();
+
+          // Persist the brand‑new chat so it exists in localStorage (or Cosmos)
+          // Using the repository keeps the same optimistic‑UI flow you already have.
+          await repository.saveChat(fresh);
+
+          // Now the in‑memory state matches the persisted store.
           setChats({ [fresh.meta.id]: fresh });
           setActiveChatId(fresh.meta.id);
         }
@@ -195,7 +202,7 @@ export const ChatProvider = ({ children }) => {
         setLoading(false);
       }
     },
-    [activeChatId, chats, chatService, repository] // persistChat removed
+    [activeChatId, chats, chatService, repository]
   );
 
   const resetChat = useCallback(async () => {
