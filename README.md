@@ -1,7 +1,7 @@
 # nscode‑webui‑react — Test Harness for **nscode‑agent‑func** (Azure Functions v2)
 
-A tiny React UI that lets you experiment with the private Azure Function wrapper  
-`CodeAgentFunction/v1/chat/completions`.  
+A tiny React UI that lets you experiment with `nscode-chat-api` which exposes an endpoint path 
+`api/v1/chat/completions`.  
 It sends OpenAI‑compatible chat requests, receives the response, and displays the conversation.
 
 ---  
@@ -23,14 +23,14 @@ It sends OpenAI‑compatible chat requests, receives the response, and displays 
 ## Features
 | ✅ | Description |
 |---|-------------|
-| **OpenAI‑compatible** | Sends the exact JSON payload the Azure Function expects (`model`, `messages`, `max_tokens`, …). |
+| **OpenAI‑compatible** | Sends the exact JSON payload the Azure Function expects (`model`, `messages`). |
 | **Rich‑text editor** | Lexical‑based editor with markdown, code‑block support and **Enter‑to‑send**. |
 | **Copy‑to‑clipboard** | One‑click copy of assistant replies. |
 | **Prompt‑profile handling** | Mirrors the intent‑profile logic used in the Azure Function (brief, standard, deep, design, review, default). |
 | **Error display** | Shows OpenAI‑style error objects returned by the function. |
 | **Zero‑config dev server** | Vite dev server with hot‑reload. |
 | **Clean‑architecture layout** | UI → feature‑scoped hooks → service → repository → infrastructure. |
-| **Local‑storage persistence only** | The client stores chats in `localStorage`; no Cosmos DB SDK or keys are shipped to the browser. |
+| **Local‑storage persistence only** | The client stores chats in either `localStorage` or `cosmosStore` with specified Cosmos DB config. |
 | **Token‑budget removed (for now)** | The token‑budget guard has been stripped out to simplify the flow; it can be re‑added later if needed. |
 
 ---  
@@ -64,7 +64,7 @@ The UI reads the Azure Function endpoint from an environment variable at **build
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `VITE_NSCODE_AGENT_ENDPOINT` | ✅ | `http://localhost:7071/CodeAgentFunction/` |
+| `VITE_NSCODE_AGENT_ENDPOINT` | ✅ | `http://localhost:7071/api/v1/` |
 
 Create a `.env` file in the project root (Vite automatically prefixes variables with `VITE_`):
 
@@ -73,7 +73,7 @@ VITE_NSCODE_AGENT_ENDPOINT=http://localhost:7071/CodeAgentFunction/
 ```
 
 > **Note** – The endpoint should point **only to the function root**.  
-> The OpenAI‑compatible path (`v1/chat/completions`) is supplied by the client when it calls the API.
+> The OpenAI‑compatible path (`/chat/completions`) is supplied by the client when it calls the API.
 
 ---  
 
@@ -86,7 +86,7 @@ Open <http://localhost:5173> (or the URL shown in the console).
 
 * Type a message → **Enter** (or click **Send**).  
 * Use triple back‑ticks (```` ``` ````) to start a code‑block.  
-* Assistant replies appear below; click the clipboard icon to copy.
+* Assistant replies flow below your message intuitively; click the clipboard icon to copy.
 
 ---  
 
@@ -120,8 +120,8 @@ src/
 │   ├─ api/
 │   │   └─ apiClient.js              # central fetch wrapper (retries, unified errors)
 │   ├─ storage/
-│   │   ├─ cosmosStore.js            # present in the repo (currently unused)
-│   │   └─ localStorageStore.js      # persistence in browser localStorage
+│   │   ├─ cosmosStore.js            # persistence in CosmosDB (VITE_USE_COSMOSDB=true)
+│   │   └─ localStorageStore.js      # persistence in browser localStorage (VITE_USE_COSMOSDB=false)
 │   └─ utils/                        # misc utilities (e.g., ErrorBoundary)
 │
 ├─ pages/
