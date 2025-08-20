@@ -20,7 +20,7 @@ export default function ChatPage() {
   return (
     <div className="app-container">
       <div className="chat-window">
-        <h1 className="chat-header">LLM Test Interface</h1>
+        <h1 className="chat-header">NSCode</h1>
 
         <ChatSelector />
         <MemoizedMessageList />

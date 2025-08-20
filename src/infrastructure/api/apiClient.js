@@ -1,30 +1,30 @@
 // src/infrastructure/api/apiClient.js
 /**
  * Central fetch wrapper used by the whole front‑end.
- * The token‑budget check has been removed (you can re‑add it later if needed).
+ * (Local development against the Azure Functions emulator does NOT require a function key.)
  */
-const BASE_URL = import.meta.env.VITE_NSCODE_AGENT_ENDPOINT; // e.g. http://localhost:7071/CodeAgentFunction/
+const BASE_URL = import.meta.env.VITE_NSCODE_AGENT_ENDPOINT; // e.g. http://localhost:7071/api/v1
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const apiClient = {
-  /**
-   * POST helper with retries and unified error shape.
-   *
-   * @param {string} path   – path to append to BASE_URL (e.g. "v1/chat/completions")
-   * @param {object} body   – JSON payload that will be stringified
-   * @param {object} [options] – currently only { retries? } is supported
-   */
-  async post(path, body, { retries = 2 } = {}) {
-    const url = `${BASE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
-    const headers = {
-      "Content-Type": "application/json",
-      ...(import.meta.env.VITE_API_TOKEN && {
-        Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-      }),
-    };
+function buildUrl(path) {
+  return `${BASE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+}
 
-    // ---------- retry loop ----------
+function buildHeaders() {
+  return {
+    "Content-Type": "application/json",
+    ...(import.meta.env.VITE_API_TOKEN && {
+      Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
+    }),
+  };
+}
+
+export const apiClient = {
+  async post(path, body, { retries = 2 } = {}) {
+    const url = buildUrl(path);
+    const headers = buildHeaders();
+
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const resp = await fetch(url, {
@@ -43,26 +43,19 @@ export const apiClient = {
         }
         return json;
       } catch (err) {
-        const isNetwork = err instanceof TypeError; // fetch throws TypeError on network failure
+        const isNetwork = err instanceof TypeError;
         if (attempt < retries && isNetwork) {
-          await delay(300 * 2 ** attempt); // exponential back‑off
+          await delay(300 * 2 ** attempt);
           continue;
         }
-        throw err; // final error
+        throw err;
       }
     }
   },
 
-  // -----------------------------------------------------------------
-  // Optional GET / DELETE helpers (they also use the same BASE_URL)
-  // -----------------------------------------------------------------
   async get(path) {
-    const url = `${BASE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
-    const headers = {
-      ...(import.meta.env.VITE_API_TOKEN && {
-        Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-      }),
-    };
+    const url = buildUrl(path);
+    const headers = buildHeaders();
     const resp = await fetch(url, { method: "GET", headers });
     const json = await resp.json().catch(() => null);
     if (!resp.ok) {
@@ -77,12 +70,8 @@ export const apiClient = {
   },
 
   async delete(path) {
-    const url = `${BASE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
-    const headers = {
-      ...(import.meta.env.VITE_API_TOKEN && {
-        Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-      }),
-    };
+    const url = buildUrl(path);
+    const headers = buildHeaders();
     const resp = await fetch(url, { method: "DELETE", headers });
     const json = await resp.json().catch(() => null);
     if (!resp.ok) {
