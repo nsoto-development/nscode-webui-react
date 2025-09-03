@@ -1,4 +1,4 @@
-# nscode‑webui‑react — Test Harness for **nscode‑agent‑func** (Azure Functions v2)
+# nscode‑webui‑react — Test Harness for **nscode-chat-api** (Azure Functions v2)
 
 A tiny React UI that lets you experiment with `nscode-chat-api` which exposes an endpoint path 
 `api/v1/chat/completions`.  
