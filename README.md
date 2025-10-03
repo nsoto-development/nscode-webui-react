@@ -181,4 +181,4 @@ All code follows the existing ESLint + Prettier configuration.
 ---  
 
 ## License
-This project is **private/internal** to the organization. Redistribution or public release requires explicit permission from the repository owners.  
+This project cannot be used for commercial purposes. This repository and any of it's contents should not be redistributed or repurposed for any reason by anyone other than it's original author. It is to be considered **private**.
